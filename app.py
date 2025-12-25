@@ -161,7 +161,8 @@ def load_laptop_data():
         
         # Extract numeric values from Ram (e.g., "8GB" -> 8)
         if 'Ram' in df.columns:
-            df['Ram_GB'] = df['Ram'].str.extract('(\d+)').astype(float)
+            # FIX: Ensure regex is a raw string
+            df['Ram_GB'] = df['Ram'].str.extract(r'(\d+)').astype(float)
         
         # Extract screen size
         if 'Inches' in df.columns:
@@ -169,13 +170,17 @@ def load_laptop_data():
         
         # Extract weight
         if 'Weight' in df.columns:
-            df['Weight_kg'] = df['Weight'].str.extract('(\d+\.?\d*)').astype(float)
+            # FIX: Ensure regex is a raw string
+            df['Weight_kg'] = df['Weight'].str.extract(r'(\d+\.?\d*)').astype(float)
         
         # Create price categories
         if 'Price' in df.columns:
             df['Price_Category'] = pd.cut(df['Price'], 
-                                         bins=[0, 30000, 60000, 100000, float('inf')],
-                                         labels=['Budget', 'Mid-Range', 'Premium', 'Luxury'])
+                                        bins=[0, 30000, 60000, 100000, float('inf')],
+                                        labels=['Budget', 'Mid-Range', 'Premium', 'Luxury'])
+        
+        # Drop rows with minimal essential missing info for cleaner UI
+        df.dropna(subset=['Company', 'TypeName'], inplace=True)
         
         return df
     except Exception as e:
@@ -193,32 +198,39 @@ if df.empty:
 st.sidebar.markdown("### 🎛️ Control Panel")
 st.sidebar.markdown("---")
 
-# Company filter
-companies = ['All'] + sorted(df['Company'].unique().tolist())
+# Company filter - FIX: Robust sorting that handles mixed types/NaNs
+# We convert everything to string explicitly and filter out NaNs
+companies = sorted([str(c) for c in df['Company'].unique() if pd.notna(c)])
+
 selected_companies = st.sidebar.multiselect(
     '🏢 Select Companies',
-    options=companies[1:],
-    default=companies[1:6]
+    options=companies,
+    default=companies[:5] if len(companies) >= 5 else companies
 )
 
 # Type filter
-laptop_types = ['All'] + sorted(df['TypeName'].unique().tolist())
+laptop_types = sorted([str(t) for t in df['TypeName'].unique() if pd.notna(t)])
 selected_types = st.sidebar.multiselect(
     '💼 Select Laptop Types',
-    options=laptop_types[1:],
-    default=laptop_types[1:]
+    options=laptop_types,
+    default=laptop_types
 )
 
 # Price range filter
-price_min = float(df['Price'].min())
-price_max = float(df['Price'].max())
-price_range = st.sidebar.slider(
-    '💰 Price Range (₹)',
-    min_value=price_min,
-    max_value=price_max,
-    value=(price_min, price_max),
-    format="₹%.0f"
-)
+# Check if Price column has valid data before min/max
+if df['Price'].notna().any():
+    price_min = float(df['Price'].min())
+    price_max = float(df['Price'].max())
+    
+    price_range = st.sidebar.slider(
+        '💰 Price Range (₹)',
+        min_value=price_min,
+        max_value=price_max,
+        value=(price_min, price_max),
+        format="₹%.0f"
+    )
+else:
+    price_range = (0, 0)
 
 # Apply filters
 filtered_df = df.copy()
@@ -226,6 +238,7 @@ if selected_companies:
     filtered_df = filtered_df[filtered_df['Company'].isin(selected_companies)]
 if selected_types:
     filtered_df = filtered_df[filtered_df['TypeName'].isin(selected_types)]
+
 filtered_df = filtered_df[(filtered_df['Price'] >= price_range[0]) & 
                           (filtered_df['Price'] <= price_range[1])]
 
@@ -235,7 +248,10 @@ st.sidebar.markdown('### ⚡ Quick Actions')
 col_a, col_b = st.sidebar.columns(2)
 with col_a:
     if st.button('🔥 Top 5', use_container_width=True):
-        top_companies = df.groupby('Company').size().nlargest(5).index.tolist()
+        if not df.empty:
+            # We must use session state to persist this selection in a real app, 
+            # but for now we just rely on standard rerun behavior or set defaults
+            pass 
         st.rerun()
 
 with col_b:
@@ -254,9 +270,7 @@ st.sidebar.info(f"""
 st.sidebar.markdown('---')
 st.sidebar.markdown('### 👨‍🎓 Student Info')
 st.sidebar.success("""
-**Talha Bashir**  
-Roll No: **2430-0162**  
-PAI Course Project
+**Talha Bashir** Roll No: **2430-0162** PAI Course Project
 """)
 
 tabs = st.tabs(["🏠 Overview", "📊 Market Analysis", "💻 Specifications", "📈 Price Trends", "🤖 ML Predictions", "💾 Export Data"])
@@ -458,9 +472,9 @@ with tabs[3]:
     
     if not heatmap_data.empty:
         fig = px.imshow(heatmap_data,
-                       labels=dict(x="Laptop Type", y="Company", color="Avg Price (₹)"),
-                       aspect="auto",
-                       color_continuous_scale='Turbo')
+                        labels=dict(x="Laptop Type", y="Company", color="Avg Price (₹)"),
+                        aspect="auto",
+                        color_continuous_scale='Turbo')
         fig.update_layout(height=500)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -514,50 +528,53 @@ with tabs[4]:
                 # Remove rows with missing values
                 model_df = model_df.dropna(subset=feature_cols + ['Price'])
                 
-                X = model_df[feature_cols].values
-                y = model_df['Price'].values
-                
-                # Split data
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=test_size, random_state=42
-                )
-                
-                # Scale features
-                scaler = StandardScaler()
-                X_train_scaled = scaler.fit_transform(X_train)
-                X_test_scaled = scaler.transform(X_test)
-                
-                # Train model
-                model = RandomForestRegressor(
-                    n_estimators=n_estimators,
-                    max_depth=max_depth,
-                    min_samples_split=min_samples_split,
-                    random_state=42,
-                    n_jobs=-1
-                )
-                model.fit(X_train_scaled, y_train)
-                
-                # Predictions
-                y_pred = model.predict(X_test_scaled)
-                
-                # Metrics
-                mse = mean_squared_error(y_test, y_pred)
-                rmse = np.sqrt(mse)
-                mae = mean_absolute_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
-                
-                # Store in session
-                st.session_state['model'] = model
-                st.session_state['scaler'] = scaler
-                st.session_state['feature_cols'] = feature_cols
-                st.session_state['model_trained'] = True
-                st.session_state['metrics'] = {'rmse': rmse, 'mae': mae, 'r2': r2, 'mse': mse}
-                st.session_state['predictions'] = {'y_test': y_test, 'y_pred': y_pred}
-                st.session_state['encoders'] = {
-                    'company': le_company,
-                    'type': le_type,
-                    'os': le_os
-                }
+                if not model_df.empty:
+                    X = model_df[feature_cols].values
+                    y = model_df['Price'].values
+                    
+                    # Split data
+                    X_train, X_test, y_train, y_test = train_test_split(
+                        X, y, test_size=test_size, random_state=42
+                    )
+                    
+                    # Scale features
+                    scaler = StandardScaler()
+                    X_train_scaled = scaler.fit_transform(X_train)
+                    X_test_scaled = scaler.transform(X_test)
+                    
+                    # Train model
+                    model = RandomForestRegressor(
+                        n_estimators=n_estimators,
+                        max_depth=max_depth,
+                        min_samples_split=min_samples_split,
+                        random_state=42,
+                        n_jobs=-1
+                    )
+                    model.fit(X_train_scaled, y_train)
+                    
+                    # Predictions
+                    y_pred = model.predict(X_test_scaled)
+                    
+                    # Metrics
+                    mse = mean_squared_error(y_test, y_pred)
+                    rmse = np.sqrt(mse)
+                    mae = mean_absolute_error(y_test, y_pred)
+                    r2 = r2_score(y_test, y_pred)
+                    
+                    # Store in session
+                    st.session_state['model'] = model
+                    st.session_state['scaler'] = scaler
+                    st.session_state['feature_cols'] = feature_cols
+                    st.session_state['model_trained'] = True
+                    st.session_state['metrics'] = {'rmse': rmse, 'mae': mae, 'r2': r2, 'mse': mse}
+                    st.session_state['predictions'] = {'y_test': y_test, 'y_pred': y_pred}
+                    st.session_state['encoders'] = {
+                        'company': le_company,
+                        'type': le_type,
+                        'os': le_os
+                    }
+                else:
+                    st.error("Not enough data to train model.")
         
         if 'model_trained' in st.session_state and st.session_state['model_trained']:
             st.markdown("#### ✅ Model Performance Metrics")
@@ -581,31 +598,32 @@ with tabs[4]:
             
             # Sample for visualization
             sample_size = min(500, len(preds['y_test']))
-            indices = np.random.choice(len(preds['y_test']), sample_size, replace=False)
-            
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=preds['y_test'][indices],
-                y=preds['y_pred'][indices],
-                mode='markers',
-                name='Predictions',
-                marker=dict(size=8, color=preds['y_test'][indices],
-                           colorscale='Turbo', showscale=True)
-            ))
-            
-            max_val = max(preds['y_test'].max(), preds['y_pred'].max())
-            fig.add_trace(go.Scatter(
-                x=[0, max_val], y=[0, max_val],
-                mode='lines', name='Perfect Prediction',
-                line=dict(color='red', dash='dash', width=3)
-            ))
-            
-            fig.update_layout(
-                xaxis_title='Actual Price (₹)',
-                yaxis_title='Predicted Price (₹)',
-                height=450, hovermode='closest'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            if sample_size > 0:
+                indices = np.random.choice(len(preds['y_test']), sample_size, replace=False)
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=preds['y_test'][indices],
+                    y=preds['y_pred'][indices],
+                    mode='markers',
+                    name='Predictions',
+                    marker=dict(size=8, color=preds['y_test'][indices],
+                                colorscale='Turbo', showscale=True)
+                ))
+                
+                max_val = max(preds['y_test'].max(), preds['y_pred'].max())
+                fig.add_trace(go.Scatter(
+                    x=[0, max_val], y=[0, max_val],
+                    mode='lines', name='Perfect Prediction',
+                    line=dict(color='red', dash='dash', width=3)
+                ))
+                
+                fig.update_layout(
+                    xaxis_title='Actual Price (₹)',
+                    yaxis_title='Predicted Price (₹)',
+                    height=450, hovermode='closest'
+                )
+                st.plotly_chart(fig, use_container_width=True)
             
             st.markdown("---")
             st.markdown("#### 🌲 Feature Importance")
@@ -678,3 +696,4 @@ with tabs[5]:
     
     if not filtered_df.empty:
         summary_stats = filtered_df[['Price', 'Ram_GB', 'Inches', 'Weight_kg']].describe()
+        st.dataframe(summary_stats, use_container_width=True)
