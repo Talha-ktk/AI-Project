@@ -11,278 +11,670 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
-# Page Configuration
-st.set_page_config(page_title="TalhaBashir | COVID-19 Intelligence", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="Laptop Price Analytics", layout="wide", page_icon="💻")
 
-# --- CUSTOM COLOR PALETTE ---
-PRIMARY_COLOR = "#008080"  # Teal
-SECONDARY_COLOR = "#DAA520" # Goldenrod
-ACCENT_COLOR = "#FF7F50"    # Coral
-BG_GRADIENT = "linear-gradient(135deg, #002b36 0%, #004d4d 100%)"
+# Custom color scheme - Modern tech-inspired palette
+PRIMARY_COLOR = "#00D9FF"
+SECONDARY_COLOR = "#FF6B35"
+ACCENT_COLOR = "#4ECDC4"
+DARK_BG = "#1A1A2E"
+LIGHT_TEXT = "#EAEAEA"
 
-# --- ADVANCED CSS INJECTION ---
 st.markdown(f"""
 <style>
-    /* Main Background */
-    .stApp {{
-        background: {BG_GRADIENT};
-        color: #e0f2f1;
-    }}
+body {{
+  background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%) !important;
+}}
 
-    /* Global Header Redesign */
-    .main-header {{
-        background: rgba(255, 255, 255, 0.05);
-        padding: 2.5rem;
-        border-radius: 15px;
-        border-left: 10px solid {SECONDARY_COLOR};
-        margin-bottom: 2.5rem;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-    }}
+.block-container {{
+  padding-top: 1.5rem;
+}}
 
-    /* Metric Card Styling */
-    [data-testid="stMetric"] {{
-        background: rgba(0, 128, 128, 0.2);
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 1px solid {SECONDARY_COLOR};
-        transition: transform 0.3s ease;
-    }}
-    [data-testid="stMetric"]:hover {{
-        transform: scale(1.02);
-        background: rgba(0, 128, 128, 0.3);
-    }}
+.main-header {{
+  background: linear-gradient(135deg, {PRIMARY_COLOR} 0%, {SECONDARY_COLOR} 100%);
+  padding: 2.5rem;
+  border-radius: 25px;
+  margin-bottom: 2rem;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+  color: white;
+  border: 2px solid rgba(255,255,255,0.1);
+}}
 
-    /* Sidebar Customization */
-    section[data-testid="stSidebar"] {{
-        background-color: #001a1a !important;
-        border-right: 1px solid {SECONDARY_COLOR};
-    }}
+.stTabs [data-baseweb="tab-list"] {{
+  background: linear-gradient(90deg, rgba(0, 217, 255, 0.15) 0%, rgba(78, 205, 196, 0.15) 100%);
+  border-radius: 15px;
+  padding: 0.6rem;
+  gap: 0.6rem;
+  border: 1px solid rgba(255,255,255,0.1);
+}}
 
-    /* Tab Styling */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 10px;
-        background-color: transparent;
-    }}
+.stTabs [data-baseweb="tab"] {{
+  background: rgba(26, 26, 46, 0.6);
+  border-radius: 12px;
+  padding: 0.9rem 1.8rem;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  border: 2px solid transparent;
+  color: #EAEAEA;
+}}
 
-    .stTabs [data-baseweb="tab"] {{
-        height: 50px;
-        background-color: rgba(218, 165, 32, 0.1);
-        border-radius: 5px 5px 0 0;
-        color: white;
-        padding: 0 20px;
-    }}
+.stTabs [data-baseweb="tab"]:hover {{
+  background: rgba(0, 217, 255, 0.2);
+  transform: translateY(-3px);
+  border-color: {ACCENT_COLOR};
+  box-shadow: 0 5px 15px rgba(0, 217, 255, 0.3);
+}}
 
-    .stTabs [data-baseweb="tab"]:hover {{
-        background-color: rgba(218, 165, 32, 0.3);
-    }}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {{
+  background: linear-gradient(135deg, {PRIMARY_COLOR}, {ACCENT_COLOR});
+  color: white;
+  box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+}}
 
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {{
-        background-color: {PRIMARY_COLOR};
-        border-bottom: 3px solid {SECONDARY_COLOR};
-    }}
+[data-testid="stMetric"] {{
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(78, 205, 196, 0.1));
+  padding: 1.2rem;
+  border-radius: 18px;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  backdrop-filter: blur(15px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}}
 
-    /* Buttons */
-    .stButton > button {{
-        width: 100%;
-        border-radius: 25px;
-        border: 2px solid {SECONDARY_COLOR};
-        background: transparent;
-        color: white;
-        font-weight: bold;
-    }}
-    .stButton > button:hover {{
-        background: {SECONDARY_COLOR};
-        color: #002b36;
-    }}
+section[data-testid="stSidebar"] > div {{
+  background: linear-gradient(180deg, rgba(15, 32, 39, 0.95) 0%, rgba(32, 58, 67, 0.95) 100%);
+  border-right: 2px solid rgba(0, 217, 255, 0.2);
+}}
 
-    .info-box {{
-        background: rgba(255, 127, 80, 0.1);
-        padding: 1rem;
-        border-radius: 8px;
-        border-right: 4px solid {ACCENT_COLOR};
-    }}
+h1, h2, h3, h4, h5, h6, p, label, span, div {{
+  color: #EAEAEA !important;
+}}
+
+.stButton > button {{
+  background: linear-gradient(135deg, {PRIMARY_COLOR}, {ACCENT_COLOR});
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.6rem 1.8rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+}}
+
+.stButton > button:hover {{
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 217, 255, 0.5);
+}}
+
+.info-box {{
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(0, 217, 255, 0.15));
+  padding: 1.5rem;
+  border-radius: 18px;
+  border-left: 5px solid {ACCENT_COLOR};
+  margin: 1rem 0;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}}
+
+.stat-card {{
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.8), rgba(44, 83, 100, 0.6));
+  padding: 1.5rem;
+  border-radius: 18px;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  margin: 0.5rem 0;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}}
+
 </style>
 """, unsafe_allow_html=True)
 
-# --- HEADER SECTION ---
 st.markdown(f"""
 <div class="main-header">
-    <h1 style='margin:0; color: {SECONDARY_COLOR}; font-family: "Trebuchet MS";'>🛡️ COVID-19 Strategic Analysis Portal</h1>
-    <h3 style='margin:0.2rem 0; font-weight: 300;'>Predictive Insights & Healthcare Surveillance</h3>
-    <hr style="border-color: {SECONDARY_COLOR}; opacity: 0.3;">
-    <p style='margin:0; font-size: 1rem; opacity: 0.8;'>
-        Principal Investigator: <strong>TalhaBashir</strong> | ID: <strong>2430-0162</strong>
-    </p>
+  <h1 style='margin:0; font-size: 2.8rem;'>💻 Laptop Price Analytics Dashboard</h1>
+  <p style='margin:0.5rem 0 0 0; font-size: 1.2rem; opacity: 0.95;'>
+    Comprehensive analysis and ML-powered price prediction for laptop market data
+  </p>
+  <p style='margin:0.5rem 0 0 0; font-size: 0.95rem; opacity: 0.75;'>
+    Developed by <strong>Talha Bashir</strong> (Roll No: 2430-0162) | Programming for AI Course Project
+  </p>
 </div>
 """, unsafe_allow_html=True)
 
-# --- DATA ENGINE ---
-@st.cache_data(show_spinner="Accessing Global Databases...")
-def load_data():
+@st.cache_data(show_spinner="Loading laptop data...")
+def load_laptop_data():
     try:
-        url = "https://raw.githubusercontent.com/COVID19Tracking/covid-tracking-data/master/data/states_daily_4pm_et.csv"
-        df = pd.read_csv(url)
-        df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
-        df = df.sort_values(['state', 'date'])
+        df = pd.read_csv("laptopData.csv")
         
-        cols_to_fix = ['positive', 'death', 'hospitalizedCurrently', 'positiveIncrease']
-        for col in cols_to_fix:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        # Clean column names
+        df.columns = df.columns.str.strip()
+        
+        # Drop unnamed columns
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        
+        # Convert Price to numeric
+        if 'Price' in df.columns:
+            df['Price'] = pd.to_numeric(df['Price'], errors='coerce')
+        
+        # Extract numeric values from Ram (e.g., "8GB" -> 8)
+        if 'Ram' in df.columns:
+            df['Ram_GB'] = df['Ram'].str.extract('(\d+)').astype(float)
+        
+        # Extract screen size
+        if 'Inches' in df.columns:
+            df['Inches'] = pd.to_numeric(df['Inches'], errors='coerce')
+        
+        # Extract weight
+        if 'Weight' in df.columns:
+            df['Weight_kg'] = df['Weight'].str.extract('(\d+\.?\d*)').astype(float)
+        
+        # Create price categories
+        if 'Price' in df.columns:
+            df['Price_Category'] = pd.cut(df['Price'], 
+                                         bins=[0, 30000, 60000, 100000, float('inf')],
+                                         labels=['Budget', 'Mid-Range', 'Premium', 'Luxury'])
+        
         return df
     except Exception as e:
-        st.error(f"Database Connection Failed: {e}")
+        st.error(f"Error loading data: {str(e)}")
         return pd.DataFrame()
 
-df = load_data()
+with st.spinner('🔄 Loading laptop data...'):
+    df = load_laptop_data()
 
-# --- SIDEBAR CONTROL PANEL ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2913/2913447.png", width=80)
-    st.markdown("## ⚙️ SYSTEM CONTROLS")
-    
-    selected_states = st.multiselect(
-        "Target Jurisdictions",
-        options=sorted(df['state'].unique()),
-        default=['NY', 'CA', 'WA']
-    )
-    
-    date_range = st.date_input(
-        "Temporal Window",
-        value=(df['date'].min(), df['date'].max())
-    )
-    
-    st.markdown("---")
-    st.markdown("### 👤 ANALYST PROFILE")
-    st.info(f"**Name:** TalhaBashir\n\n**Reg ID:** 2430-0162")
-    
-    if st.button("♻️ Reset System"):
+if df.empty:
+    st.error("⚠️ Unable to load laptopData.csv. Please ensure the file exists in the same directory.")
+    st.stop()
+
+# Sidebar
+st.sidebar.markdown("### 🎛️ Control Panel")
+st.sidebar.markdown("---")
+
+# Company filter
+companies = ['All'] + sorted(df['Company'].unique().tolist())
+selected_companies = st.sidebar.multiselect(
+    '🏢 Select Companies',
+    options=companies[1:],
+    default=companies[1:6]
+)
+
+# Type filter
+laptop_types = ['All'] + sorted(df['TypeName'].unique().tolist())
+selected_types = st.sidebar.multiselect(
+    '💼 Select Laptop Types',
+    options=laptop_types[1:],
+    default=laptop_types[1:]
+)
+
+# Price range filter
+price_min = float(df['Price'].min())
+price_max = float(df['Price'].max())
+price_range = st.sidebar.slider(
+    '💰 Price Range (₹)',
+    min_value=price_min,
+    max_value=price_max,
+    value=(price_min, price_max),
+    format="₹%.0f"
+)
+
+# Apply filters
+filtered_df = df.copy()
+if selected_companies:
+    filtered_df = filtered_df[filtered_df['Company'].isin(selected_companies)]
+if selected_types:
+    filtered_df = filtered_df[filtered_df['TypeName'].isin(selected_types)]
+filtered_df = filtered_df[(filtered_df['Price'] >= price_range[0]) & 
+                          (filtered_df['Price'] <= price_range[1])]
+
+st.sidebar.markdown('---')
+st.sidebar.markdown('### ⚡ Quick Actions')
+
+col_a, col_b = st.sidebar.columns(2)
+with col_a:
+    if st.button('🔥 Top 5', use_container_width=True):
+        top_companies = df.groupby('Company').size().nlargest(5).index.tolist()
         st.rerun()
 
-# Data Filtering
-mask = (df['state'].isin(selected_states)) & (df['date'] >= pd.to_datetime(date_range[0]))
-if len(date_range) > 1:
-    mask &= (df['date'] <= pd.to_datetime(date_range[1]))
-filtered_df = df[mask]
+with col_b:
+    if st.button('🔄 Reset', use_container_width=True):
+        st.rerun()
 
-# --- MAIN LAYOUT TABS ---
-t1, t2, t3, t4 = st.tabs(["📊 Executive Summary", "📈 Propagation Trends", "🤖 Predictive ML", "📂 Data Vault"])
+st.sidebar.markdown('---')
+st.sidebar.markdown('### 📊 Dataset Info')
+st.sidebar.info(f"""
+**Total Laptops**: {len(df):,}  
+**Companies**: {df['Company'].nunique()}  
+**Laptop Types**: {df['TypeName'].nunique()}  
+**Price Range**: ₹{df['Price'].min():,.0f} - ₹{df['Price'].max():,.0f}
+""")
 
-# TAB 1: EXECUTIVE SUMMARY
-with t1:
-    st.subheader("Current Surveillance Status")
-    latest = df[df['date'] == df['date'].max()]
+st.sidebar.markdown('---')
+st.sidebar.markdown('### 👨‍🎓 Student Info')
+st.sidebar.success("""
+**Talha Bashir**  
+Roll No: **2430-0162**  
+PAI Course Project
+""")
+
+tabs = st.tabs(["🏠 Overview", "📊 Market Analysis", "💻 Specifications", "📈 Price Trends", "🤖 ML Predictions", "💾 Export Data"])
+
+# TAB 1: Overview
+with tabs[0]:
+    st.markdown("### 📊 Market Overview")
     
-    # Redesigned Layout: Metrics at top in a clean row
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Confirmed Cases", f"{latest['positive'].sum():,.0f}", "Global Total")
-    m2.metric("Mortality", f"{latest['death'].sum():,.0f}", "Cumulative")
-    m3.metric("Clinical Load", f"{latest['hospitalizedCurrently'].sum():,.0f}", "Current")
-    m4.metric("Positivity Rate", f"{(latest['positiveIncrease'].sum()/1000):.2f}%", "Daily Avg")
-
-    st.markdown("### System-Wide Distribution")
-    col_left, col_right = st.columns([2, 1])
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        avg_price = filtered_df['Price'].mean()
+        st.metric('💵 Avg Price', f'₹{avg_price:,.0f}')
+    with col2:
+        total_laptops = len(filtered_df)
+        st.metric('💻 Total Laptops', f'{total_laptops:,}')
+    with col3:
+        avg_ram = filtered_df['Ram_GB'].mean()
+        st.metric('🧠 Avg RAM', f'{avg_ram:.1f}GB')
+    with col4:
+        avg_screen = filtered_df['Inches'].mean()
+        st.metric('📺 Avg Screen', f'{avg_screen:.1f}"')
+    with col5:
+        companies_count = filtered_df['Company'].nunique()
+        st.metric('🏢 Companies', f'{companies_count}')
     
-    with col_left:
-        # State Comparison Bar Chart
-        fig_bar = px.bar(
-            latest.nlargest(10, 'positive'),
-            x='state', y='positive',
-            color='positive',
-            color_continuous_scale='Tealgrn',
-            title="Top 10 States by Volume"
-        )
-        fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    with col_right:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="info-box">
-            <h4 style='color:{SECONDARY_COLOR}'>Analyst Insight</h4>
-            The current visualization focuses on the highest-impact zones within the selected temporal window. 
-            <b>TalhaBashir</b> suggests monitoring the hospitalization-to-ICU ratio for system stress indicators.
-        </div>
-        """, unsafe_allow_html=True)
-
-# TAB 2: PROPAGATION TRENDS
-with t2:
-    st.subheader("Temporal Progression Analysis")
+    st.markdown("---")
     
-    metric_choice = st.selectbox("Select Telemetry Stream", ["positiveIncrease", "deathIncrease", "hospitalizedCurrently"])
+    col1, col2 = st.columns(2)
     
-    fig_trend = px.line(
-        filtered_df, 
-        x='date', y=metric_choice, 
-        color='state',
-        line_shape='spline',
-        render_mode='svg',
-        title=f"Time-Series: {metric_choice.replace('Increase', ' Daily')}"
-    )
-    fig_trend.update_layout(
-        hovermode="x unified",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font_color="white"
-    )
-    st.plotly_chart(fig_trend, use_container_width=True)
+    with col1:
+        st.markdown("### 💰 Price Distribution by Company")
+        company_prices = filtered_df.groupby('Company')['Price'].mean().sort_values(ascending=False).head(10)
+        fig = px.bar(company_prices, 
+                     orientation='h',
+                     labels={'value': 'Average Price (₹)', 'Company': 'Company'},
+                     color=company_prices.values,
+                     color_continuous_scale='Turbo')
+        fig.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("### 📊 Laptop Type Distribution")
+        type_counts = filtered_df['TypeName'].value_counts().head(10)
+        fig = px.pie(values=type_counts.values, 
+                     names=type_counts.index,
+                     hole=0.4,
+                     color_discrete_sequence=px.colors.sequential.Turbo)
+        fig.update_traces(textposition='inside', textinfo='percent+label')
+        fig.update_layout(height=400, showlegend=True)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### 💻 Top 10 Most Expensive Laptops")
+    top_expensive = filtered_df.nlargest(10, 'Price')[['Company', 'TypeName', 'Cpu', 'Ram', 'Price']]
+    top_expensive['Price'] = top_expensive['Price'].apply(lambda x: f'₹{x:,.0f}')
+    st.dataframe(top_expensive.reset_index(drop=True), use_container_width=True)
 
-# TAB 3: PREDICTIVE ML
-with t3:
-    st.subheader("🤖 Machine Learning Projection")
-    st.write("Model: Random Forest Regressor | Target: Daily New Cases")
+# TAB 2: Market Analysis
+with tabs[1]:
+    st.markdown("### 🏢 Market Share & Competition Analysis")
     
-    if st.button("⚡ Initialize ML Training Sequence"):
-        # Quick data prep
-        ml_data = filtered_df.dropna(subset=['positive', 'death', 'positiveIncrease'])
-        X = ml_data[['positive', 'death', 'hospitalizedCurrently']].fillna(0)
-        y = ml_data['positiveIncrease']
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Market Share by Company")
+        company_counts = filtered_df['Company'].value_counts().head(8)
+        fig = px.pie(values=company_counts.values,
+                     names=company_counts.index,
+                     title='Top 8 Companies by Product Count',
+                     color_discrete_sequence=px.colors.sequential.Teal)
+        fig.update_layout(height=450)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### Average Price by Company")
+        company_avg_price = filtered_df.groupby('Company')['Price'].mean().sort_values(ascending=False).head(8)
+        fig = px.bar(company_avg_price,
+                     title='Top 8 Companies by Average Price',
+                     labels={'value': 'Avg Price (₹)', 'Company': 'Company'},
+                     color=company_avg_price.values,
+                     color_continuous_scale='Plasma')
+        fig.update_layout(showlegend=False, height=450)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Operating System Distribution")
+        os_counts = filtered_df['OpSys'].value_counts()
+        fig = px.bar(os_counts,
+                     labels={'value': 'Count', 'index': 'Operating System'},
+                     color=os_counts.values,
+                     color_continuous_scale='Viridis')
+        fig.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### Price Range Distribution")
+        fig = px.histogram(filtered_df, x='Price', nbins=30,
+                          labels={'Price': 'Price (₹)'},
+                          color_discrete_sequence=[PRIMARY_COLOR])
+        fig.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
+# TAB 3: Specifications
+with tabs[2]:
+    st.markdown("### 💻 Technical Specifications Analysis")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("#### RAM Distribution")
+        ram_counts = filtered_df['Ram'].value_counts().sort_index()
+        fig = px.bar(ram_counts,
+                     labels={'value': 'Count', 'index': 'RAM'},
+                     color=ram_counts.values,
+                     color_continuous_scale='Blues')
+        fig.update_layout(showlegend=False, height=350)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### Screen Size Distribution")
+        screen_counts = filtered_df['Inches'].value_counts().sort_index()
+        fig = px.bar(screen_counts,
+                     labels={'value': 'Count', 'index': 'Screen Size (inches)'},
+                     color=screen_counts.values,
+                     color_continuous_scale='Greens')
+        fig.update_layout(showlegend=False, height=350)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col3:
+        st.markdown("#### Weight Distribution")
+        fig = px.histogram(filtered_df, x='Weight_kg', nbins=20,
+                          labels={'Weight_kg': 'Weight (kg)'},
+                          color_discrete_sequence=[SECONDARY_COLOR])
+        fig.update_layout(showlegend=False, height=350)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🎯 Specification Impact on Price")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### RAM vs Price")
+        fig = px.box(filtered_df, x='Ram', y='Price',
+                     color='Ram',
+                     labels={'Price': 'Price (₹)', 'Ram': 'RAM'},
+                     color_discrete_sequence=px.colors.sequential.Turbo)
+        fig.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### Screen Size vs Price")
+        fig = px.scatter(filtered_df, x='Inches', y='Price',
+                        color='Company', size='Weight_kg',
+                        labels={'Price': 'Price (₹)', 'Inches': 'Screen Size (inches)'},
+                        hover_data=['Company', 'TypeName'])
+        fig.update_layout(height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
+# TAB 4: Price Trends
+with tabs[3]:
+    st.markdown("### 📈 Price Analysis & Trends")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Price by Type")
+        type_price = filtered_df.groupby('TypeName')['Price'].agg(['mean', 'min', 'max']).sort_values('mean', ascending=False)
         
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name='Average', x=type_price.index, y=type_price['mean'],
+                            marker_color=PRIMARY_COLOR))
+        fig.add_trace(go.Scatter(name='Max', x=type_price.index, y=type_price['max'],
+                                mode='markers', marker=dict(size=10, color=SECONDARY_COLOR)))
+        fig.update_layout(height=400, barmode='group')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### Price Distribution by Category")
+        fig = px.box(filtered_df, x='Price_Category', y='Price',
+                     color='Price_Category',
+                     labels={'Price': 'Price (₹)', 'Price_Category': 'Category'},
+                     color_discrete_sequence=px.colors.sequential.Plasma)
+        fig.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    st.markdown("#### 🔥 Price Comparison Heatmap")
+    
+    # Create pivot table for heatmap
+    heatmap_data = filtered_df.groupby(['Company', 'TypeName'])['Price'].mean().unstack(fill_value=0)
+    
+    if not heatmap_data.empty:
+        fig = px.imshow(heatmap_data,
+                       labels=dict(x="Laptop Type", y="Company", color="Avg Price (₹)"),
+                       aspect="auto",
+                       color_continuous_scale='Turbo')
+        fig.update_layout(height=500)
+        st.plotly_chart(fig, use_container_width=True)
+
+# TAB 5: ML Predictions
+with tabs[4]:
+    st.markdown("### 🤖 Machine Learning - Price Prediction Model")
+    st.markdown("**Predicting laptop prices using Random Forest Regressor**")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("#### 🎛️ Model Configuration")
         
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
+        n_estimators = st.slider("Number of Trees", 10, 200, 100, 10)
+        max_depth = st.slider("Max Depth", 5, 50, 20, 5)
+        min_samples_split = st.slider("Min Samples Split", 2, 20, 5, 1)
+        test_size = st.slider("Test Size (%)", 10, 40, 20, 5) / 100
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.success("Model Training Complete")
-            st.metric("Model Reliability (R²)", f"{r2_score(y_test, preds):.4f}")
-        with c2:
-            st.metric("Mean Absolute Error", f"{mean_absolute_error(y_test, preds):,.2f}")
+        train_button = st.button("🚀 Train Model", use_container_width=True, type="primary")
+        
+        st.markdown("---")
+        st.info("""
+        **Features:**
+        - RAM (GB)
+        - Screen Size (inches)
+        - Weight (kg)
+        - Company (encoded)
+        - Type (encoded)
+        - OS (encoded)
+        """)
+    
+    with col2:
+        if train_button or 'model_trained' not in st.session_state:
+            with st.spinner('Training model...'):
+                # Prepare features
+                model_df = filtered_df.copy()
+                
+                # Encode categorical variables
+                le_company = LabelEncoder()
+                le_type = LabelEncoder()
+                le_os = LabelEncoder()
+                
+                model_df['Company_encoded'] = le_company.fit_transform(model_df['Company'])
+                model_df['Type_encoded'] = le_type.fit_transform(model_df['TypeName'])
+                model_df['OS_encoded'] = le_os.fit_transform(model_df['OpSys'])
+                
+                # Select features
+                feature_cols = ['Ram_GB', 'Inches', 'Weight_kg', 'Company_encoded', 
+                               'Type_encoded', 'OS_encoded']
+                
+                # Remove rows with missing values
+                model_df = model_df.dropna(subset=feature_cols + ['Price'])
+                
+                X = model_df[feature_cols].values
+                y = model_df['Price'].values
+                
+                # Split data
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=test_size, random_state=42
+                )
+                
+                # Scale features
+                scaler = StandardScaler()
+                X_train_scaled = scaler.fit_transform(X_train)
+                X_test_scaled = scaler.transform(X_test)
+                
+                # Train model
+                model = RandomForestRegressor(
+                    n_estimators=n_estimators,
+                    max_depth=max_depth,
+                    min_samples_split=min_samples_split,
+                    random_state=42,
+                    n_jobs=-1
+                )
+                model.fit(X_train_scaled, y_train)
+                
+                # Predictions
+                y_pred = model.predict(X_test_scaled)
+                
+                # Metrics
+                mse = mean_squared_error(y_test, y_pred)
+                rmse = np.sqrt(mse)
+                mae = mean_absolute_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
+                
+                # Store in session
+                st.session_state['model'] = model
+                st.session_state['scaler'] = scaler
+                st.session_state['feature_cols'] = feature_cols
+                st.session_state['model_trained'] = True
+                st.session_state['metrics'] = {'rmse': rmse, 'mae': mae, 'r2': r2, 'mse': mse}
+                st.session_state['predictions'] = {'y_test': y_test, 'y_pred': y_pred}
+                st.session_state['encoders'] = {
+                    'company': le_company,
+                    'type': le_type,
+                    'os': le_os
+                }
+        
+        if 'model_trained' in st.session_state and st.session_state['model_trained']:
+            st.markdown("#### ✅ Model Performance Metrics")
             
-        # Prediction Chart
-        res_df = pd.DataFrame({'Actual': y_test, 'Predicted': preds}).reset_index()
-        fig_res = px.scatter(res_df, x='Actual', y='Predicted', 
-                           marginal_x="histogram", marginal_y="rug",
-                           color_discrete_sequence=[ACCENT_COLOR])
-        fig_res.add_shape(type="line", x0=y_test.min(), y0=y_test.min(), x1=y_test.max(), y1=y_test.max(),
-                        line=dict(color=SECONDARY_COLOR, dash="dash"))
-        st.plotly_chart(fig_res, use_container_width=True)
+            metrics = st.session_state['metrics']
+            
+            col_a, col_b, col_c, col_d = st.columns(4)
+            with col_a:
+                st.metric("R² Score", f"{metrics['r2']:.4f}")
+            with col_b:
+                st.metric("RMSE", f"₹{metrics['rmse']:,.0f}")
+            with col_c:
+                st.metric("MAE", f"₹{metrics['mae']:,.0f}")
+            with col_d:
+                st.metric("MSE", f"₹{metrics['mse']:,.0f}")
+            
+            st.markdown("---")
+            st.markdown("#### 📊 Predictions vs Actual Prices")
+            
+            preds = st.session_state['predictions']
+            
+            # Sample for visualization
+            sample_size = min(500, len(preds['y_test']))
+            indices = np.random.choice(len(preds['y_test']), sample_size, replace=False)
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=preds['y_test'][indices],
+                y=preds['y_pred'][indices],
+                mode='markers',
+                name='Predictions',
+                marker=dict(size=8, color=preds['y_test'][indices],
+                           colorscale='Turbo', showscale=True)
+            ))
+            
+            max_val = max(preds['y_test'].max(), preds['y_pred'].max())
+            fig.add_trace(go.Scatter(
+                x=[0, max_val], y=[0, max_val],
+                mode='lines', name='Perfect Prediction',
+                line=dict(color='red', dash='dash', width=3)
+            ))
+            
+            fig.update_layout(
+                xaxis_title='Actual Price (₹)',
+                yaxis_title='Predicted Price (₹)',
+                height=450, hovermode='closest'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("#### 🌲 Feature Importance")
+            
+            model = st.session_state['model']
+            feature_cols = st.session_state['feature_cols']
+            
+            importances = model.feature_importances_
+            feature_imp_df = pd.DataFrame({
+                'Feature': feature_cols,
+                'Importance': importances
+            }).sort_values('Importance', ascending=True)
+            
+            fig = px.bar(feature_imp_df, x='Importance', y='Feature',
+                        orientation='h', color='Importance',
+                        color_continuous_scale='Teal')
+            fig.update_layout(showlegend=False, height=400)
+            st.plotly_chart(fig, use_container_width=True)
 
-# TAB 4: DATA VAULT
-with t4:
-    st.subheader("Binary Data Export")
-    st.dataframe(filtered_df.style.background_gradient(cmap='Blues'), height=400)
+# TAB 6: Export
+with tabs[5]:
+    st.markdown("### 💾 Data Export & Downloads")
     
-    csv = filtered_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "📥 Download Secure Dataset",
-        csv,
-        "TalhaBashir_COVID_Data.csv",
-        "text/csv",
-        use_container_width=True
-    )
-
-# --- FOOTER ---
-st.markdown("---")
-st.markdown(f"""
-<div style='text-align: center; opacity: 0.6; padding: 20px;'>
-    <small>Data Processing Unit: TalhaBashir (2430-0162) | Source: COVID Tracking Project | Built with Streamlit & Python</small>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("#### 📄 Preview Filtered Data")
+    st.dataframe(filtered_df.head(20), use_container_width=True)
+    
+    st.markdown("---")
+    st.markdown("#### ⬇️ Download Options")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        csv = filtered_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Filtered Data (CSV)",
+            data=csv,
+            file_name=f'laptops_filtered_{datetime.now().strftime("%Y%m%d_%H%M")}.csv',
+            mime='text/csv',
+            use_container_width=True
+        )
+    
+    with col2:
+        full_csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Complete Dataset (CSV)",
+            data=full_csv,
+            file_name=f'laptops_complete_{datetime.now().strftime("%Y%m%d_%H%M")}.csv',
+            mime='text/csv',
+            use_container_width=True
+        )
+    
+    with col3:
+        if not filtered_df.empty:
+            summary = filtered_df.groupby('Company').agg({
+                'Price': ['mean', 'min', 'max', 'count'],
+                'Ram_GB': 'mean',
+                'Inches': 'mean'
+            }).round(2)
+            summary_csv = summary.to_csv().encode('utf-8')
+            st.download_button(
+                label="📥 Company Summary (CSV)",
+                data=summary_csv,
+                file_name=f'company_summary_{datetime.now().strftime("%Y%m%d_%H%M")}.csv',
+                mime='text/csv',
+                use_container_width=True
+            )
+    
+    st.markdown("---")
+    st.markdown("#### 📊 Statistical Summary")
+    
+    if not filtered_df.empty:
+        summary_stats = filtered_df[['Price', 'Ram_GB', 'Inches', 'Weight_kg']].describe()
