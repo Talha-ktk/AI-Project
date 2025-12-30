@@ -399,13 +399,17 @@ with tabs[4]:
         # =======================
         # MODEL PERFORMANCE
         # =======================
+        # =======================
+
         st.markdown("### 📊 Model Performance")
+
+        rmse = np.sqrt(mean_squared_error(y_test, predictions))
 
         m1, m2, m3 = st.columns(3)
 
         m1.metric(
             "RMSE",
-            f"₹{mean_squared_error(y_test, predictions, squared=False):,.0f}"
+            f"₹{rmse:,.0f}"
         )
 
         m2.metric(
@@ -417,6 +421,7 @@ with tabs[4]:
             "R² Score",
             f"{r2_score(y_test, predictions):.4f}"
         )
+
 
         # =======================
         # ACTUAL VS PREDICTED
