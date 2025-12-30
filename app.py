@@ -304,28 +304,80 @@ with tabs[3]:
 # =====================================================
 # MACHINE LEARNING
 # =====================================================
+# =====================================================
+# TAB 5 — MACHINE LEARNING (LAPTOP PRICE PREDICTION)
+# =====================================================
 with tabs[4]:
-    st.subheader("🤖 Random Forest Price Prediction")
+    st.markdown("## 🤖 Laptop Price Prediction Model")
+    st.markdown("""
+    This module uses a **Random Forest Regressor** to predict laptop prices  
+    based on **hardware specifications and brand information**.
 
-    n_estimators = st.slider("Trees", 50, 300, 150, 25)
-    max_depth = st.slider("Max Depth", 5, 40, 20, 5)
-    test_size = st.slider("Test Size (%)", 10, 40, 20, 5) / 100
+    **Features Used**
+    - RAM (GB)
+    - Screen Size (Inches)
+    - Weight (kg)
+    - Company (Encoded)
+    - Laptop Type (Encoded)
+    - Operating System (Encoded)
+    """)
 
-    if st.button("🚀 Train Model"):
+    st.divider()
+
+    colA, colB, colC = st.columns(3)
+
+    with colA:
+        n_estimators = st.slider(
+            "🌲 Number of Trees",
+            min_value=50,
+            max_value=300,
+            value=150,
+            step=25
+        )
+
+    with colB:
+        max_depth = st.slider(
+            "📏 Maximum Tree Depth",
+            min_value=5,
+            max_value=40,
+            value=20,
+            step=5
+        )
+
+    with colC:
+        test_size = st.slider(
+            "🧪 Test Data Size (%)",
+            min_value=10,
+            max_value=40,
+            value=20,
+            step=5
+        ) / 100
+
+    st.markdown("### 🚀 Train Laptop Price Prediction Model")
+
+    if st.button("Train Model"):
         model_df = filtered_df.dropna(subset=[
-            "Price", "Ram_GB", "Inches",
-            "Weight_kg", "Company", "TypeName", "OpSys"
+            "Price", "Ram_GB", "Inches", "Weight_kg",
+            "Company", "TypeName", "OpSys"
         ])
 
-        le_c, le_t, le_o = LabelEncoder(), LabelEncoder(), LabelEncoder()
-        model_df["Company_enc"] = le_c.fit_transform(model_df["Company"])
-        model_df["Type_enc"] = le_t.fit_transform(model_df["TypeName"])
-        model_df["OS_enc"] = le_o.fit_transform(model_df["OpSys"])
+        if len(model_df) < 50:
+            st.warning("Not enough data to train the model.")
+            st.stop()
 
-        X = model_df[[
-            "Ram_GB", "Inches", "Weight_kg",
-            "Company_enc", "Type_enc", "OS_enc"
-        ]]
+        # Encode categorical variables
+        le_company = LabelEncoder()
+        le_type = LabelEncoder()
+        le_os = LabelEncoder()
+
+        model_df["Company_enc"] = le_company.fit_transform(model_df["Company"])
+        model_df["Type_enc"] = le_type.fit_transform(model_df["TypeName"])
+        model_df["OS_enc"] = le_os.fit_transform(model_df["OpSys"])
+
+        X = model_df[
+            ["Ram_GB", "Inches", "Weight_kg",
+             "Company_enc", "Type_enc", "OS_enc"]
+        ]
         y = model_df["Price"]
 
         X_train, X_test, y_train, y_test = train_test_split(
@@ -338,20 +390,65 @@ with tabs[4]:
             random_state=42,
             n_jobs=-1
         )
+
         model.fit(X_train, y_train)
-        
-        # --- NEW CODE FROM IMAGE STARTS HERE ---
-        preds = model.predict(X_test)
+        predictions = model.predict(X_test)
 
-        rmse = np.sqrt(mean_squared_error(y_test, preds))
-        mae = mean_absolute_error(y_test, preds)
-        r2 = r2_score(y_test, preds)
+        st.success("✅ Model trained successfully!")
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("RMSE", f"₹{rmse:,.0f}")
-        c2.metric("MAE", f"₹{mae:,.0f}")
-        c3.metric("R²", f"{r2:.4f}")
-        # --- NEW CODE ENDS HERE ---
+        # =======================
+        # MODEL PERFORMANCE
+        # =======================
+        st.markdown("### 📊 Model Performance")
+
+        m1, m2, m3 = st.columns(3)
+
+        m1.metric(
+            "RMSE",
+            f"₹{mean_squared_error(y_test, predictions, squared=False):,.0f}"
+        )
+
+        m2.metric(
+            "MAE",
+            f"₹{mean_absolute_error(y_test, predictions):,.0f}"
+        )
+
+        m3.metric(
+            "R² Score",
+            f"{r2_score(y_test, predictions):.4f}"
+        )
+
+        # =======================
+        # ACTUAL VS PREDICTED
+        # =======================
+        st.markdown("### 📈 Actual vs Predicted Laptop Prices")
+
+        fig = px.scatter(
+            x=y_test,
+            y=predictions,
+            labels={
+                "x": "Actual Price (₹)",
+                "y": "Predicted Price (₹)"
+            }
+        )
+
+        fig.add_shape(
+            type="line",
+            x0=y_test.min(),
+            y0=y_test.min(),
+            x1=y_test.max(),
+            y1=y_test.max(),
+            line=dict(dash="dash")
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("""
+        **Interpretation**
+        - Points closer to the diagonal line indicate better predictions  
+        - Higher R² score means stronger predictive performance  
+        - Random Forest handles non-linear price relationships effectively
+        """)
 
 # =====================================================
 # EXPORT
