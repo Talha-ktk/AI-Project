@@ -20,28 +20,9 @@ st.set_page_config(
 )
 
 # =====================================================
-# PAGE CONFIG
-# =====================================================
-st.set_page_config(
-    page_title="Laptop Price Analytics",
-    layout="wide",
-    page_icon="💻"
-)
-
-# =====================================================
-# PAGE CONFIG
-# =====================================================
-st.set_page_config(
-    page_title="Laptop Price Analytics",
-    layout="wide",
-    page_icon="💻"
-)
-
-# =====================================================
 # CLEAN & MINIMAL THEME
 # =====================================================
-# A soft, airy palette with no heavy dark blocks
-PRIMARY_COLOR = "#2563EB"      # A clean, standard blue for buttons only
+PRIMARY_COLOR = "#2563EB"       # A clean, standard blue for buttons only
 BG_COLOR = "#FAFAFA"           # Almost white (Very clean)
 CARD_BG = "#FFFFFF"            # Pure White
 TEXT_COLOR = "#334155"         # Slate 700 (Softer than black)
@@ -164,16 +145,30 @@ st.markdown("""
 # =====================================================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("laptopData.csv")
+    # UPDATED: Load the cleaned dataset
+    try:
+        df = pd.read_csv("final_cleaned_laptop_data.csv")
+    except FileNotFoundError:
+        st.error("File 'final_cleaned_laptop_data.csv' not found. Please upload it.")
+        return pd.DataFrame()
+
     df.columns = df.columns.str.strip()
     df = df.loc[:, ~df.columns.str.contains("Unnamed")]
 
+    # UPDATED: Rename OpSys_Category to OpSys for compatibility
+    if "OpSys_Category" in df.columns:
+        df.rename(columns={"OpSys_Category": "OpSys"}, inplace=True)
+
+    # Ensure numeric types
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-
-    df["Ram_GB"] = df["Ram"].str.extract(r"(\d+)").astype(float)
     df["Inches"] = pd.to_numeric(df["Inches"], errors="coerce")
-    df["Weight_kg"] = df["Weight"].str.extract(r"(\d+\.?\d*)").astype(float)
+    
+    # UPDATED: Map existing numeric columns to expected names
+    # The cleaned file already has 'Ram' as int and 'Weight' as float
+    df["Ram_GB"] = df["Ram"]
+    df["Weight_kg"] = df["Weight"]
 
+    # Create Price Category
     df["Price_Category"] = pd.cut(
         df["Price"],
         bins=[0, 30000, 60000, 100000, np.inf],
@@ -187,7 +182,6 @@ def load_data():
 df = load_data()
 
 if df.empty:
-    st.error("Dataset not found or empty.")
     st.stop()
 
 # =====================================================
@@ -267,8 +261,9 @@ with tabs[1]:
 # SPECS (NA-SAFE SCATTER)
 # =====================================================
 with tabs[2]:
+    # Use Ram_GB or Ram (both are numeric now)
     fig = px.box(
-        filtered_df, x="Ram", y="Price",
+        filtered_df, x="Ram_GB", y="Price",
         title="RAM vs Price"
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -303,9 +298,6 @@ with tabs[3]:
 
 # =====================================================
 # MACHINE LEARNING
-# =====================================================
-# =====================================================
-# TAB 5 — MACHINE LEARNING (LAPTOP PRICE PREDICTION)
 # =====================================================
 with tabs[4]:
     st.markdown("## 🤖 Laptop Price Prediction Model")
@@ -370,6 +362,7 @@ with tabs[4]:
         le_type = LabelEncoder()
         le_os = LabelEncoder()
 
+        model_df = model_df.copy()
         model_df["Company_enc"] = le_company.fit_transform(model_df["Company"])
         model_df["Type_enc"] = le_type.fit_transform(model_df["TypeName"])
         model_df["OS_enc"] = le_os.fit_transform(model_df["OpSys"])
@@ -398,7 +391,6 @@ with tabs[4]:
 
         # =======================
         # MODEL PERFORMANCE
-        # =======================
         # =======================
 
         st.markdown("### 📊 Model Performance")
