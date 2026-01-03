@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# CLEAN & MINIMAL THEME
+# CLEAN & MINIMAL THEME (CSS)
 # =====================================================
 PRIMARY_COLOR = "#2563EB"       # A clean, standard blue for buttons only
 BG_COLOR = "#FAFAFA"           # Almost white (Very clean)
@@ -30,7 +30,6 @@ HEADER_COLOR = "#0F172A"       # Slate 900 (Dark & crisp for titles)
 
 st.markdown(f"""
 <style>
-
 /* -------- App Background -------- */
 .stApp {{
   background-color: {BG_COLOR};
@@ -125,7 +124,6 @@ section[data-testid="stSidebar"] {{
   background-color: #FFFFFF;
   border-right: 1px solid #F1F5F9;
 }}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -145,17 +143,18 @@ st.markdown("""
 # =====================================================
 @st.cache_data
 def load_data():
-    # UPDATED: Load the cleaned dataset
     try:
+        # Koshish karein file load karne ki
         df = pd.read_csv("final_cleaned_laptop_data.csv")
     except FileNotFoundError:
-        st.error("File 'final_cleaned_laptop_data.csv' not found. Please upload it.")
+        # Agar file na mile, to error show karein
+        st.error("⚠️ File 'final_cleaned_laptop_data.csv' not found. Please upload it to your project folder or GitHub repo.")
         return pd.DataFrame()
 
+    # Column names cleaning
     df.columns = df.columns.str.strip()
     df = df.loc[:, ~df.columns.str.contains("Unnamed")]
 
-    # UPDATED: Rename OpSys_Category to OpSys for compatibility
     if "OpSys_Category" in df.columns:
         df.rename(columns={"OpSys_Category": "OpSys"}, inplace=True)
 
@@ -163,10 +162,11 @@ def load_data():
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
     df["Inches"] = pd.to_numeric(df["Inches"], errors="coerce")
     
-    # UPDATED: Map existing numeric columns to expected names
-    # The cleaned file already has 'Ram' as int and 'Weight' as float
-    df["Ram_GB"] = df["Ram"]
-    df["Weight_kg"] = df["Weight"]
+    # Map existing numeric columns to expected names
+    if "Ram" in df.columns:
+        df["Ram_GB"] = df["Ram"]
+    if "Weight" in df.columns:
+        df["Weight_kg"] = df["Weight"]
 
     # Create Price Category
     df["Price_Category"] = pd.cut(
@@ -177,7 +177,6 @@ def load_data():
 
     df.dropna(subset=["Company", "TypeName"], inplace=True)
     return df
-
 
 df = load_data()
 
@@ -221,7 +220,7 @@ tabs = st.tabs([
 ])
 
 # =====================================================
-# OVERVIEW
+# 1. OVERVIEW
 # =====================================================
 with tabs[0]:
     c1, c2, c3, c4 = st.columns(4)
@@ -230,24 +229,32 @@ with tabs[0]:
     c3.metric("Avg RAM", f"{filtered_df['Ram_GB'].mean():.1f} GB")
     c4.metric("Companies", filtered_df["Company"].nunique())
 
+    # Data for bar chart
+    top_companies = filtered_df.groupby("Company")["Price"].mean().sort_values(ascending=True).tail(10)
+
     fig = px.bar(
-        filtered_df.groupby("Company")["Price"].mean()
-        .sort_values(ascending=False).head(10),
+        top_companies,
         orientation="h",
         title="Top 10 Companies by Average Price",
         color_discrete_sequence=[PRIMARY_COLOR]
     )
+    
+    # Fix: Center Title & Labels
+    fig.update_layout(
+        title_x=0.5,
+        xaxis_title="Average Price (₹)",
+        yaxis_title="Company"
+    )
+    
     st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
-# MARKET
+# 2. MARKET
 # =====================================================
 with tabs[1]:
-    # 1. Create a proper DataFrame with names and counts
     share_df = filtered_df["Company"].value_counts().head(8).reset_index()
     share_df.columns = ["Company", "Count"]
 
-    # 2. Explicitly tell Plotly what to use for names and values
     fig = px.pie(
         share_df,
         names="Company", 
@@ -255,63 +262,88 @@ with tabs[1]:
         hole=0.4,
         title="Market Share by Company"
     )
+    
+    # Fix: Center Title
+    fig.update_layout(title_x=0.5)
+    
     st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
-# SPECS (NA-SAFE SCATTER)
+# 3. SPECS (Ram Gap Fix Here)
 # =====================================================
 with tabs[2]:
-    # Use Ram_GB or Ram (both are numeric now)
-    fig = px.box(
-        filtered_df, x="Ram_GB", y="Price",
-        title="RAM vs Price"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    # --- Chart 1: RAM vs Price ---
+    # Fix 1: Data Sort karo taake order sahi rahe
+    df_sorted_ram = filtered_df.sort_values(by="Ram_GB")
 
+    fig_ram = px.box(
+        df_sorted_ram, 
+        x="Ram_GB", 
+        y="Price",
+        title="RAM Impact on Price"
+    )
+    
+    # Fix 2: 'category' type use karo taake gap khatam ho, aur Title Center karo
+    fig_ram.update_layout(
+        title_x=0.5,
+        xaxis_title="RAM (GB)",
+        yaxis_title="Price (₹)",
+        xaxis=dict(type='category') # <--- Yeh sabse zaroori line hai
+    )
+    st.plotly_chart(fig_ram, use_container_width=True)
+
+    # --- Chart 2: Scatter Plot ---
     scatter_df = filtered_df.dropna(
         subset=["Inches", "Price", "Weight_kg", "Company"]
     )
 
     if not scatter_df.empty:
-        fig = px.scatter(
+        fig_scatter = px.scatter(
             scatter_df,
             x="Inches",
             y="Price",
             size="Weight_kg",
             color="Company",
             size_max=25,
-            title="Screen Size vs Price (Bubble = Weight)"
+            title="Screen Size vs Price (Bubble size = Weight)"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        
+        # Fix: Center Title
+        fig_scatter.update_layout(
+            title_x=0.5,
+            xaxis_title="Screen Size (Inches)",
+            yaxis_title="Price (₹)"
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True)
 
 # =====================================================
-# TRENDS
+# 4. TRENDS
 # =====================================================
 with tabs[3]:
     fig = px.box(
         filtered_df,
         x="Price_Category",
         y="Price",
-        title="Price Distribution by Category"
+        title="Price Distribution by Category",
+        color="Price_Category"
+    )
+    
+    # Fix: Center Title
+    fig.update_layout(
+        title_x=0.5,
+        xaxis_title="Category",
+        yaxis_title="Price (₹)"
     )
     st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
-# MACHINE LEARNING
+# 5. MACHINE LEARNING
 # =====================================================
 with tabs[4]:
     st.markdown("## 🤖 Laptop Price Prediction Model")
     st.markdown("""
     This module uses a **Random Forest Regressor** to predict laptop prices  
     based on **hardware specifications and brand information**.
-
-    **Features Used**
-    - RAM (GB)
-    - Screen Size (Inches)
-    - Weight (kg)
-    - Company (Encoded)
-    - Laptop Type (Encoded)
-    - Operating System (Encoded)
     """)
 
     st.divider()
@@ -319,31 +351,11 @@ with tabs[4]:
     colA, colB, colC = st.columns(3)
 
     with colA:
-        n_estimators = st.slider(
-            "🌲 Number of Trees",
-            min_value=50,
-            max_value=300,
-            value=150,
-            step=25
-        )
-
+        n_estimators = st.slider("🌲 Number of Trees", 50, 300, 150, 25)
     with colB:
-        max_depth = st.slider(
-            "📏 Maximum Tree Depth",
-            min_value=5,
-            max_value=40,
-            value=20,
-            step=5
-        )
-
+        max_depth = st.slider("📏 Maximum Tree Depth", 5, 40, 20, 5)
     with colC:
-        test_size = st.slider(
-            "🧪 Test Data Size (%)",
-            min_value=10,
-            max_value=40,
-            value=20,
-            step=5
-        ) / 100
+        test_size = st.slider("🧪 Test Data Size (%)", 10, 40, 20, 5) / 100
 
     st.markdown("### 🚀 Train Laptop Price Prediction Model")
 
@@ -357,7 +369,7 @@ with tabs[4]:
             st.warning("Not enough data to train the model.")
             st.stop()
 
-        # Encode categorical variables
+        # Encoding
         le_company = LabelEncoder()
         le_type = LabelEncoder()
         le_os = LabelEncoder()
@@ -367,88 +379,45 @@ with tabs[4]:
         model_df["Type_enc"] = le_type.fit_transform(model_df["TypeName"])
         model_df["OS_enc"] = le_os.fit_transform(model_df["OpSys"])
 
-        X = model_df[
-            ["Ram_GB", "Inches", "Weight_kg",
-             "Company_enc", "Type_enc", "OS_enc"]
-        ]
+        X = model_df[["Ram_GB", "Inches", "Weight_kg", "Company_enc", "Type_enc", "OS_enc"]]
         y = model_df["Price"]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42
-        )
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
         model = RandomForestRegressor(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            random_state=42,
-            n_jobs=-1
+            n_estimators=n_estimators, max_depth=max_depth, random_state=42, n_jobs=-1
         )
-
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
 
         st.success("✅ Model trained successfully!")
 
-        # =======================
-        # MODEL PERFORMANCE
-        # =======================
-
         st.markdown("### 📊 Model Performance")
-
         rmse = np.sqrt(mean_squared_error(y_test, predictions))
-
         m1, m2, m3 = st.columns(3)
+        m1.metric("RMSE", f"₹{rmse:,.0f}")
+        m2.metric("MAE", f"₹{mean_absolute_error(y_test, predictions):,.0f}")
+        m3.metric("R² Score", f"{r2_score(y_test, predictions):.4f}")
 
-        m1.metric(
-            "RMSE",
-            f"₹{rmse:,.0f}"
-        )
-
-        m2.metric(
-            "MAE",
-            f"₹{mean_absolute_error(y_test, predictions):,.0f}"
-        )
-
-        m3.metric(
-            "R² Score",
-            f"{r2_score(y_test, predictions):.4f}"
-        )
-
-
-        # =======================
-        # ACTUAL VS PREDICTED
-        # =======================
         st.markdown("### 📈 Actual vs Predicted Laptop Prices")
-
         fig = px.scatter(
             x=y_test,
             y=predictions,
-            labels={
-                "x": "Actual Price (₹)",
-                "y": "Predicted Price (₹)"
-            }
+            labels={"x": "Actual Price (₹)", "y": "Predicted Price (₹)"},
+            title="Actual vs Predicted Prices"
         )
-
         fig.add_shape(
-            type="line",
-            x0=y_test.min(),
-            y0=y_test.min(),
-            x1=y_test.max(),
-            y1=y_test.max(),
-            line=dict(dash="dash")
+            type="line", x0=y_test.min(), y0=y_test.min(), x1=y_test.max(), y1=y_test.max(),
+            line=dict(dash="dash", color="red")
         )
-
+        
+        # Fix: Center Title
+        fig.update_layout(title_x=0.5)
+        
         st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown("""
-        **Interpretation**
-        - Points closer to the diagonal line indicate better predictions  
-        - Higher R² score means stronger predictive performance  
-        - Random Forest handles non-linear price relationships effectively
-        """)
-
 # =====================================================
-# EXPORT  
+# 6. EXPORT  
 # =====================================================
 with tabs[5]:
     st.dataframe(filtered_df.head(20), use_container_width=True)
