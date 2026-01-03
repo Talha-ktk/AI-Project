@@ -20,109 +20,38 @@ st.set_page_config(
 )
 
 # =====================================================
-# CLEAN & MINIMAL THEME (CSS)
+# CLEAN & MINIMAL THEME
 # =====================================================
-PRIMARY_COLOR = "#2563EB"       # A clean, standard blue for buttons only
-BG_COLOR = "#FAFAFA"           # Almost white (Very clean)
-CARD_BG = "#FFFFFF"            # Pure White
-TEXT_COLOR = "#334155"         # Slate 700 (Softer than black)
-HEADER_COLOR = "#0F172A"       # Slate 900 (Dark & crisp for titles)
+PRIMARY_COLOR = "#2563EB"       # A clean, standard blue
+BG_COLOR = "#FAFAFA"            # Almost white
+CARD_BG = "#FFFFFF"             # Pure White
+TEXT_COLOR = "#334155"          # Slate 700
+HEADER_COLOR = "#0F172A"        # Slate 900
 
 st.markdown(f"""
 <style>
-/* -------- App Background -------- */
-.stApp {{
-  background-color: {BG_COLOR};
-}}
-
-/* -------- Typography -------- */
-h1, h2, h3 {{
-  color: {HEADER_COLOR} !important;
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-}}
-
-/* -------- Header Card (Clean White) -------- */
+.stApp {{ background-color: {BG_COLOR}; }}
+h1, h2, h3 {{ color: {HEADER_COLOR} !important; font-family: 'Inter', sans-serif; font-weight: 700; }}
 .header-card {{
-  background-color: {CARD_BG};
-  padding: 2rem;
-  border-radius: 12px;
-  border: 1px solid #E2E8F0; /* Subtle border */
-  margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Very soft shadow */
+    background-color: {CARD_BG};
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }}
-
-.header-card h1 {{
-  color: {HEADER_COLOR} !important;
-  margin-bottom: 0.2rem;
-}}
-
-.header-card p {{
-  color: #64748B !important; /* Muted slate for subtitle */
-  font-size: 1rem;
-}}
-
-/* -------- Metric Cards (Minimalist) -------- */
 [data-testid="stMetric"] {{
-  background-color: {CARD_BG};
-  border: 1px solid #F1F5F9;
-  border-radius: 10px;
-  padding: 1.2rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    background-color: {CARD_BG};
+    border: 1px solid #F1F5F9;
+    border-radius: 10px;
+    padding: 1.2rem;
 }}
-
-[data-testid="stMetricLabel"] {{
-  color: #94A3B8 !important; /* Light gray label */
-  font-size: 0.85rem;
-  font-weight: 500;
-}}
-
-[data-testid="stMetricValue"] {{
-  color: {HEADER_COLOR} !important;
-  font-size: 1.8rem;
-}}
-
-/* -------- Tabs (Simple & Elegant) -------- */
-.stTabs [data-baseweb="tab-list"] {{
-  background-color: transparent;
-  border-bottom: 1px solid #E2E8F0;
-  gap: 24px;
-}}
-
-.stTabs [data-baseweb="tab"] {{
-  background-color: transparent;
-  color: #64748B;
-  font-weight: 500;
-  border: none;
-  padding-bottom: 12px;
-}}
-
-.stTabs [aria-selected="true"] {{
-  color: {PRIMARY_COLOR} !important;
-  border-bottom: 2px solid {PRIMARY_COLOR};
-}}
-
-/* -------- Buttons (Subtle) -------- */
 .stButton > button {{
-  background-color: {PRIMARY_COLOR};
-  color: white;
-  border-radius: 8px;
-  font-weight: 500;
-  border: none;
-  padding: 0.5rem 1.2rem;
-  box-shadow: none;
-}}
-
-.stButton > button:hover {{
-  background-color: #1D4ED8;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-}}
-
-/* Sidebar tweaks to match */
-section[data-testid="stSidebar"] {{
-  background-color: #FFFFFF;
-  border-right: 1px solid #F1F5F9;
+    background-color: {PRIMARY_COLOR};
+    color: white;
+    border-radius: 8px;
+    font-weight: 500;
+    border: none;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -134,7 +63,7 @@ st.markdown("""
 <div class="header-card">
   <h1>💻 Laptop Price Analytics Dashboard</h1>
   <p>Market Analysis & Machine Learning Price Prediction</p>
-  <p><b>Talha Bashir , Abdullah</b> | Roll No: 2430-0162 , 2430-0067 | PAI Course Project</p>
+  <p><b>Talha Bashir, Abdullah</b> | Roll No: 2430-0162, 2430-0067 | PAI Course Project</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -143,39 +72,32 @@ st.markdown("""
 # =====================================================
 @st.cache_data
 def load_data():
+    # UPDATED: Matches the specific filename with the trailing space
+    file_path = "final_cleaned_laptop_data .csv"
     try:
-        # Koshish karein file load karne ki
-        df = pd.read_csv("final_cleaned_laptop_data.csv")
+        df = pd.read_csv(file_path)
     except FileNotFoundError:
-        # Agar file na mile, to error show karein
-        st.error("⚠️ File 'final_cleaned_laptop_data.csv' not found. Please upload it to your project folder or GitHub repo.")
+        st.error(f"File '{file_path}' not found. Please ensure it is in the same directory.")
         return pd.DataFrame()
 
-    # Column names cleaning
+    # Clean column names
     df.columns = df.columns.str.strip()
-    df = df.loc[:, ~df.columns.str.contains("Unnamed")]
-
+    
+    # Map columns to internal names used in the app
     if "OpSys_Category" in df.columns:
         df.rename(columns={"OpSys_Category": "OpSys"}, inplace=True)
-
-    # Ensure numeric types
-    df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-    df["Inches"] = pd.to_numeric(df["Inches"], errors="coerce")
     
-    # Map existing numeric columns to expected names
-    if "Ram" in df.columns:
-        df["Ram_GB"] = df["Ram"]
-    if "Weight" in df.columns:
-        df["Weight_kg"] = df["Weight"]
+    # The dataset already contains Ram (int) and Weight (float)
+    df["Ram_GB"] = df["Ram"]
+    df["Weight_kg"] = df["Weight"]
 
-    # Create Price Category
+    # Create Price Category for visualization
     df["Price_Category"] = pd.cut(
         df["Price"],
-        bins=[0, 30000, 60000, 100000, np.inf],
+        bins=[0, 35000, 75000, 120000, np.inf],
         labels=["Budget", "Mid-Range", "Premium", "Luxury"]
     )
 
-    df.dropna(subset=["Company", "TypeName"], inplace=True)
     return df
 
 df = load_data()
@@ -188,18 +110,14 @@ if df.empty:
 # =====================================================
 st.sidebar.header("🎛️ Filters")
 
-companies = sorted(df["Company"].dropna().unique())
-types = sorted(df["TypeName"].dropna().unique())
+companies = sorted(df["Company"].unique())
+types = sorted(df["TypeName"].unique())
 
-selected_companies = st.sidebar.multiselect(
-    "Company", companies, companies[:5] if len(companies) >= 5 else companies
-)
-selected_types = st.sidebar.multiselect("Laptop Type", types, types)
+selected_companies = st.sidebar.multiselect("Company", companies, default=companies[:5])
+selected_types = st.sidebar.multiselect("Laptop Type", types, default=types)
 
 price_min, price_max = float(df["Price"].min()), float(df["Price"].max())
-price_range = st.sidebar.slider(
-    "Price Range (₹)", price_min, price_max, (price_min, price_max)
-)
+price_range = st.sidebar.slider("Price Range (₹)", price_min, price_max, (price_min, price_max))
 
 filtered_df = df[
     (df["Company"].isin(selected_companies)) &
@@ -208,20 +126,15 @@ filtered_df = df[
 ]
 
 if filtered_df.empty:
-    st.warning("No data for selected filters.")
+    st.warning("No data matches the selected filters.")
     st.stop()
 
 # =====================================================
 # TABS
 # =====================================================
-tabs = st.tabs([
-    "🏠 Overview", "📊 Market", "💻 Specs",
-    "📈 Trends", "🤖 ML Model", "💾 Export"
-])
+tabs = st.tabs(["🏠 Overview", "📊 Market", "💻 Specs", "📈 Trends", "🤖 ML Model", "💾 Export"])
 
-# =====================================================
-# 1. OVERVIEW
-# =====================================================
+# OVERVIEW
 with tabs[0]:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Avg Price", f"₹{filtered_df['Price'].mean():,.0f}")
@@ -229,203 +142,82 @@ with tabs[0]:
     c3.metric("Avg RAM", f"{filtered_df['Ram_GB'].mean():.1f} GB")
     c4.metric("Companies", filtered_df["Company"].nunique())
 
-    # Data for bar chart
-    top_companies = filtered_df.groupby("Company")["Price"].mean().sort_values(ascending=True).tail(10)
-
     fig = px.bar(
-        top_companies,
-        orientation="h",
+        filtered_df.groupby("Company")["Price"].mean().sort_values(ascending=False).head(10).reset_index(),
+        x="Price", y="Company", orientation="h",
         title="Top 10 Companies by Average Price",
         color_discrete_sequence=[PRIMARY_COLOR]
     )
-    
-    # Fix: Center Title & Labels
-    fig.update_layout(
-        title_x=0.5,
-        xaxis_title="Average Price (₹)",
-        yaxis_title="Company"
-    )
-    
     st.plotly_chart(fig, use_container_width=True)
 
-# =====================================================
-# 2. MARKET
-# =====================================================
+# MARKET
 with tabs[1]:
     share_df = filtered_df["Company"].value_counts().head(8).reset_index()
     share_df.columns = ["Company", "Count"]
-
-    fig = px.pie(
-        share_df,
-        names="Company", 
-        values="Count",
-        hole=0.4,
-        title="Market Share by Company"
-    )
-    
-    # Fix: Center Title
-    fig.update_layout(title_x=0.5)
-    
+    fig = px.pie(share_df, names="Company", values="Count", hole=0.4, title="Market Share (Selected Data)")
     st.plotly_chart(fig, use_container_width=True)
 
-# =====================================================
-# 3. SPECS (Ram Gap Fix Here)
-# =====================================================
+# SPECS
 with tabs[2]:
-    # --- Chart 1: RAM vs Price ---
-    # Fix 1: Data Sort karo taake order sahi rahe
-    df_sorted_ram = filtered_df.sort_values(by="Ram_GB")
+    fig = px.box(filtered_df, x="Ram_GB", y="Price", title="RAM Impact on Price")
+    st.plotly_chart(fig, use_container_width=True)
 
-    fig_ram = px.box(
-        df_sorted_ram, 
-        x="Ram_GB", 
-        y="Price",
-        title="RAM Impact on Price"
-    )
-    
-    # Fix 2: 'category' type use karo taake gap khatam ho, aur Title Center karo
-    fig_ram.update_layout(
-        title_x=0.5,
-        xaxis_title="RAM (GB)",
-        yaxis_title="Price (₹)",
-        xaxis=dict(type='category') # <--- Yeh sabse zaroori line hai
-    )
-    st.plotly_chart(fig_ram, use_container_width=True)
-
-    # --- Chart 2: Scatter Plot ---
-    scatter_df = filtered_df.dropna(
-        subset=["Inches", "Price", "Weight_kg", "Company"]
-    )
-
-    if not scatter_df.empty:
-        fig_scatter = px.scatter(
-            scatter_df,
-            x="Inches",
-            y="Price",
-            size="Weight_kg",
-            color="Company",
-            size_max=25,
-            title="Screen Size vs Price (Bubble size = Weight)"
-        )
-        
-        # Fix: Center Title
-        fig_scatter.update_layout(
-            title_x=0.5,
-            xaxis_title="Screen Size (Inches)",
-            yaxis_title="Price (₹)"
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
-
-# =====================================================
-# 4. TRENDS
-# =====================================================
-with tabs[3]:
-    fig = px.box(
-        filtered_df,
-        x="Price_Category",
-        y="Price",
-        title="Price Distribution by Category",
-        color="Price_Category"
-    )
-    
-    # Fix: Center Title
-    fig.update_layout(
-        title_x=0.5,
-        xaxis_title="Category",
-        yaxis_title="Price (₹)"
+    fig = px.scatter(
+        filtered_df, x="Inches", y="Price", size="Weight_kg", color="Company",
+        title="Screen Size vs Price (Bubble size = Weight)"
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# =====================================================
-# 5. MACHINE LEARNING
-# =====================================================
+# TRENDS
+with tabs[3]:
+    fig = px.histogram(filtered_df, x="Price", color="Price_Category", title="Price Distribution")
+    st.plotly_chart(fig, use_container_width=True)
+
+# MACHINE LEARNING
 with tabs[4]:
     st.markdown("## 🤖 Laptop Price Prediction Model")
-    st.markdown("""
-    This module uses a **Random Forest Regressor** to predict laptop prices  
-    based on **hardware specifications and brand information**.
-    """)
-
-    st.divider()
-
+    
     colA, colB, colC = st.columns(3)
-
-    with colA:
-        n_estimators = st.slider("🌲 Number of Trees", 50, 300, 150, 25)
-    with colB:
-        max_depth = st.slider("📏 Maximum Tree Depth", 5, 40, 20, 5)
-    with colC:
-        test_size = st.slider("🧪 Test Data Size (%)", 10, 40, 20, 5) / 100
-
-    st.markdown("### 🚀 Train Laptop Price Prediction Model")
+    n_estimators = colA.slider("Trees", 50, 300, 150)
+    max_depth = colB.slider("Max Depth", 5, 40, 20)
+    test_size = colC.slider("Test Size (%)", 10, 40, 20) / 100
 
     if st.button("Train Model"):
-        model_df = filtered_df.dropna(subset=[
-            "Price", "Ram_GB", "Inches", "Weight_kg",
-            "Company", "TypeName", "OpSys"
-        ])
-
-        if len(model_df) < 50:
-            st.warning("Not enough data to train the model.")
-            st.stop()
+        # Select relevant features from your CSV
+        features = ["Ram_GB", "Inches", "Weight_kg", "Company", "TypeName", "OpSys", "Cpu_Speed_GHz", "SSD"]
+        model_df = filtered_df.dropna(subset=features + ["Price"]).copy()
 
         # Encoding
-        le_company = LabelEncoder()
-        le_type = LabelEncoder()
-        le_os = LabelEncoder()
+        le = LabelEncoder()
+        for col in ["Company", "TypeName", "OpSys"]:
+            model_df[col] = le.fit_transform(model_df[col])
 
-        model_df = model_df.copy()
-        model_df["Company_enc"] = le_company.fit_transform(model_df["Company"])
-        model_df["Type_enc"] = le_type.fit_transform(model_df["TypeName"])
-        model_df["OS_enc"] = le_os.fit_transform(model_df["OpSys"])
-
-        X = model_df[["Ram_GB", "Inches", "Weight_kg", "Company_enc", "Type_enc", "OS_enc"]]
+        X = model_df[features]
         y = model_df["Price"]
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
-        model = RandomForestRegressor(
-            n_estimators=n_estimators, max_depth=max_depth, random_state=42, n_jobs=-1
-        )
+        model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
         model.fit(X_train, y_train)
-        predictions = model.predict(X_test)
+        preds = model.predict(X_test)
 
-        st.success("✅ Model trained successfully!")
-
-        st.markdown("### 📊 Model Performance")
-        rmse = np.sqrt(mean_squared_error(y_test, predictions))
+        # Metrics
         m1, m2, m3 = st.columns(3)
-        m1.metric("RMSE", f"₹{rmse:,.0f}")
-        m2.metric("MAE", f"₹{mean_absolute_error(y_test, predictions):,.0f}")
-        m3.metric("R² Score", f"{r2_score(y_test, predictions):.4f}")
+        m1.metric("RMSE", f"₹{np.sqrt(mean_squared_error(y_test, preds)):,.0f}")
+        m2.metric("MAE", f"₹{mean_absolute_error(y_test, preds):,.0f}")
+        m3.metric("R² Score", f"{r2_score(y_test, preds):.4f}")
 
-        st.markdown("### 📈 Actual vs Predicted Laptop Prices")
-        fig = px.scatter(
-            x=y_test,
-            y=predictions,
-            labels={"x": "Actual Price (₹)", "y": "Predicted Price (₹)"},
-            title="Actual vs Predicted Prices"
-        )
-        fig.add_shape(
-            type="line", x0=y_test.min(), y0=y_test.min(), x1=y_test.max(), y1=y_test.max(),
-            line=dict(dash="dash", color="red")
-        )
-        
-        # Fix: Center Title
-        fig.update_layout(title_x=0.5)
-        
+        fig = px.scatter(x=y_test, y=preds, labels={'x': 'Actual', 'y': 'Predicted'}, title="Actual vs Predicted")
+        fig.add_shape(type="line", x0=y_test.min(), y0=y_test.min(), x1=y_test.max(), y1=y_test.max(), line=dict(dash="dash"))
         st.plotly_chart(fig, use_container_width=True)
 
-# =====================================================
-# 6. EXPORT  
-# =====================================================
+# EXPORT
 with tabs[5]:
-    st.dataframe(filtered_df.head(20), use_container_width=True)
-
+    st.dataframe(filtered_df, use_container_width=True)
     csv = filtered_df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "📥 Download Filtered CSV",
+        "📥 Download Filtered Results",
         csv,
-        f"laptops_filtered_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+        f"laptop_data_{datetime.now().strftime('%Y%m%d')}.csv",
         "text/csv"
     )
